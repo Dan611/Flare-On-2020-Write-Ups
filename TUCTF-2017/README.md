@@ -1,1 +1,1 @@
-# CTF Write-Ups for the 2017 TU CTF
+# Write-ups for the 2017 TU CTF
