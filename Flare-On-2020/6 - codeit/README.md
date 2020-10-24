@@ -15,6 +15,7 @@ CMDLINERAW
 >>>AUTOIT NO CMDEXECUTE<<<
 ```
 There's much more, but it seems that this is a compiled AutoIt 3 script. Decompiling the .exe with an AutoIt decompiler gives us an obfuscated mess of a script, along with the .bmp the script displays and an external QR-code generator library:
+
 ![6c8aa15ab2f1f12b9c1d7fef4e00ffcc.png](../_resources/f3d7b8c8ecff4278817c5096bfe75fdb.png)
 
 Some extracts of the script are as follows:

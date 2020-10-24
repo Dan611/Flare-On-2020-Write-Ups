@@ -9,6 +9,7 @@ This challenge can get a bit messy, so here is a general overview of its compone
 
 
 Immediately when we extract `crackstaller.exe` to begin the challenge, Windows Defender alerts us:
+
 ![76dcd899309074e56ca8b81895699a93.png](../_resources/8e76ccfdda7f4441a1fa8d0fd9295b77.png)
 
 A quick search of this virus signature name reveals that Capcom's anti-cheat rootkit was detected inside the binary. If we follow the process execution in ProcMon, we can note the following:
@@ -25,9 +26,11 @@ A quick search of this virus signature name reveals that Capcom's anti-cheat roo
 
 
 If we check the SHA-256 of `cfs.dll` on VirusTotal, we can confirm this is Capcom's rootkit:
+
 ![f38558b585b4d9e14ccee0a2bf60b6fe.png](../_resources/fd50aa6061af41f08f8d476cd1196d42.png)
 
 The `DeviceIoControl` import in `crackstaller.exe` is used to communicate with the rootkit:
+
 ![70a01f6e22614edd72fc98c1315d795c.png](../_resources/44f5a501aee246018ba7154f06b32501.png)
 
 It allocates a buffer containing some ASM necessary to jump back into `crackstaller.exe` from the rootkit, but with the priviledged execution of kernel mode. It jumps to `crackstaller.exe` at `sub_140002A10`, which I have renamed `called_from_kernel` below, where it uses byte signature scanning to find NT functions:
@@ -37,26 +40,33 @@ It allocates a buffer containing some ASM necessary to jump back into `crackstal
 Next `crackstaller.exe` allocates a kernel pool, then copies `driver.sys` into it. After that, it scans for some specific bytes and patches them:
 
 ![3519a16e34fa56bd53b0c10061827acc.png](../_resources/fcf150e665d243b088eacca2a71d8381.png)
+
 ![9490e081a2d8a97408368f4c1f75bfc3.png](../_resources/a53b146029f947d6a7fa399a6351cde5.png)
 
 If this patch doesn't occur, later string decryption fails, so this obfuscation is important to take note of. Finally, it creates a system thread at `driver.sys:DriverBootstrap`, where the filter driver loads itself into memory and begins execution:
+
 ![7680814d4d175930bfaeb73f6bcd21d7.png](../_resources/7bb9c93009e841399716bdcf1b38a116.png)
 
 Once `driver.sys` is able to call its `DriverEntry`, it creates a device driver to register a `RegistryCallback` routine through a call to `CmRegisterCallbackEx`, which will scan for registry changes:
+
 ![b493be03af8b6b7ddb36b6ffa70482da.png](../_resources/76bb0dd182ae43649016b3876e089caa.png)
 
 Inside the callback, the filter driver scans for a specific registry key using `wcsstr`:
+
 ![5d08b3c4714a75f9d478844913896ec8.png](../_resources/928152cdbe484d33b6a82b65630cf8c7.png)
 
 If the string is a match, `driver.sys` does some decryption to retrieve the password `H@n $h0t FiRst!`. Note the `BBACABA` byte string it uses in the decryption. This was set earlier in `crackstaller.exe` before calling `driver.sys`:
+
 ![bf18f9e330c9c8118292f7694689b4f3.png](../_resources/539a42174252404994756cc7e9c513d2.png)
 
 The password is expanded into a `wchar_t`, then passed as the `Class` parameter to `ZwCreateKey`:
+
 ![7d16a8dc7b52524f396564bfa3296d63.png](../_resources/bec6f63172bf41bca086b4cfa38c4e4a.png)
 
 The driver then stops monitoring for registry changes by calling `CmUnRegisterCallback`. So we have some kind of password, apparently the "class" of the registry key `Computer\HKEY_CURRENT_USER\Software\Classes\CLSID\{CEEACC6E-CCB2-4C4F-BCF6-D2176037A9A7}\Config`. We need to see if we can interract with the COM server that was set up. Taking a look inside `credHelper.dll`, note the following two functions that interact with the registry keys found earlier:
 
 ![f92f2eaf7b87c5d08c608fec1d2322d5.png](../_resources/e308a33f1e2a46f5859998a23909c560.png)
+
 ![911e404859527c8796cfc7523661d1ef.png](../_resources/52aa8e5d542545b18140e881227bff01.png)
 
 Inside the binary we can also find the bytes for the CLSID being used earlier, as well as an antirely new one:

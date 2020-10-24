@@ -9,6 +9,7 @@ Although that's not very reassuring, taking a peek at the file reveals it to be 
 ![c427bdbe3ef7df7e5b93c88ca9a2240e.png](../_resources/748e16ffeb1d47198df2acf61c6143ad.png)
 
 Hmm...  In IDA the function call that stands out the most is `ptrace`, which is called 57 times!
+
 ![484fa3d1bedcd6e7e9b0a29fe0535ff0.png](../_resources/09cab9e470024be1a800fd3eed348c6a.png)
 
 It's important to realize just how versatile [ptrace](https://www.man7.org/linux/man-pages/man2/ptrace.2.html) can be, so here are some of the arguments to it we might expect to see:
@@ -22,13 +23,17 @@ PTRACE_SETREGS  - Set the target process registers
 PTRACE_CONT     - Continue target process execution after an interrupt
 ```
 With just these arguments you could potentially write a fully-fledged debugger, which seems likely considering how many calls are occuring. The process has two main forks which then attach to their parent and act like debuggers, intercepting certain calls and signals. Here is the first `fork` call, and it is interesting to note that this is called from `init`, before the process's `main` function even has a chance to execute:
+
 ![6de1f23f07e879f56799bee718377586.png](../_resources/4f170fc43a92413cb5a392c0792230c8.png)
+
 ![4408e62449f827bc26f6164157870a9c.png](../_resources/9c352b7840964da79b81090ac6ef349c.png)
 
 Now we have the original parent process, as well as a fork that has attached to it using `ptrace`. Also note the `_nanosleep_` call, which will give the forked child process some time to attach before the parent resumes executing after the fork call. Some similar code is called from this child fork, where a second fork is created that then attaches itself to the first fork:
 
 ![4324899e86dc76f1b97c357ac0ccfb13.png](../_resources/42e9f90fb9ba4bec8a60279bd6827ca4.png)
+
 ![e8591eddc49d5f6c90f99348c9f89f6f.png](../_resources/bc5f2fda970c4ea89c7ffe153ea43128.png)
+
 ![914939b9d8b6f7c0137385ecef8306fe.png](../_resources/7289a30f93154d1092684726e146ebea.png)
 
 It's become a bit convoluted, but we now have our original parent process, a primary fork of the parent that has attached to the parent as a debugger, and a secondary fork of the primary fork that has attached to the primary fork as a debugger. Each of these debuggers can intercept certain calls or interrupt signals, then read and write to memory and registers.
@@ -89,9 +94,11 @@ This means, for example, that the comparison at the bottom of the IDA snippit ab
 
 One example VM function is the following, which occurs when the parent attempts a `sys_read`. The parent's `main` function prints some prompts then attempts to read from `stdin` to get the user to input the flag. The flag is then checked against a string, and the process exits:
 ![11209b5c5e2f68d82180628bfb9138f0.png](../_resources/6295d5acedef446a99fb12819c807234.png)
+
 ![d8217aa733df4dede28b92717bfd2769.png](../_resources/5c50b9220ed646fbb0729ee49417a38e.png)
 
 We know that the program doesn't actually seem to work so simply though, because somewhere along the way our input was overwritten. The marked `_read` operation above in the parent triggers the following VM handler function in the primary fork:
+
 ![44e34fd26ed3bfbd0d2fb7278218aebb.png](../_resources/e6644d8207274d80ab505fea6a0ab1ae.png)
 
 What is happening? First, the fork calls `_fgets` to actually acquire the user input. Next, `0xB8` is passed into a `string_decryptor` function, which returns a decrypted string stored at a certain index in the binary. This string is then written into the parent process's memory using `write_mem_to_pid`, which is simply a wrapper for `PTRACE_POKEDATA`.
@@ -155,9 +162,11 @@ The parent's `main` function still wasn't doing anything that would lead us to t
 ![db2f6ad5b7a3fc05c0544599dea06ea7.png](../_resources/ff1aa64f2a624694ae0a7939c318699b.png)
 
 At the bottom of the primary fork debugger handler, the program specifically checks for this signal. The first thing it does is write the input string it intercepted back into the parent process at a known location, then change the instruction pointer to an entirely new function:
+
 ![55d9b6fe28e7ac6e1330b264ba9e76b8.png](../_resources/a219b39e3ee9474faaf3821c228f42ec.png)
 
 Afterwards, the parent process will now resume execution here:
+
 ![4e233f6ce71db20077a342f15bcccad5.png](../_resources/f7f9b29ca5434828bb74cabf49909d41.png)
 
 The parent process then makes some VM calls and calls some decryptor functions, and finally compares our input string to what it decrypted. A trick here is that if we modify the binary to re-route `_memcmp` calls to `puts`, and NOP out the ```push [ebp+input_string_ptr]``` so that the decrypted data pointer is at the top of the stack, we can see what its trying to compare against:
@@ -169,9 +178,11 @@ The parent process then makes some VM calls and calls some decryptor functions, 
 ![be3d69377279e568bb6a671c3826e951.png](../_resources/79f14d22a17147efac31cf95cf5b734b.png)
 
 This appears to be the first part of the flag. Execution procedes to the following function call:
+
 ![904cec7f180a405170400f2b68d57a3e.png](../_resources/45238fe81f3947108afb36cfc1db48fb.png)
 
 We can see it's looping over our input string, then using it somehow with a `_truncate` VM call:
+
 ![f3c10aa6793df8a1aa7e1a4d29a72580.png](../_resources/5fdb389b2d01455180038c9817634d37.png)
 
 As was hinted to us in one of the decrypted strings, this part uses something similar to XXTEA encryption to encode our input bytes. It uses lots of syscalls which get handled in the primary fork debugger, some of which call NULL pointers themsleves, which then get handled by the second debugger!
@@ -181,6 +192,7 @@ Even for simply looping, the parent proces calls a NULL pointer, which sends a `
 ![64dd2fc64268dc4883d06814aea4e14c.png](../_resources/4f85708574a545338834fbc56267e94f.png)
 
 Here is where it's handled in the primary fork debugger, where the `i` loop count variable is incremented, and we loop if `i` is less than 16, othwersie we return from the call and exit the loop:
+
 ![ef48476061214fda6c60f4d790c90b85.png](../_resources/ae453e77fe164240af4da95dadc59198.png)
 
 We can re-implement this ASM labyrinth in Python like so:
@@ -210,7 +222,9 @@ def xxtea(data, key, encrypt):
 ```
 
 Then we can plug in this encoded value that it is comparing our XXTEA encrytped input to:
+
 ![c514b8d934d183a3a7c7431a877645df.png](../_resources/d52e4a7ab4e5404b8edb3e773c4bff57.png)
+
 ![5709299f317860661ac093813ecc77c4.png](../_resources/ea776ff15b104ed8886e942685b2353c.png)
 
 Running this data throuugh the decryption function yields the second part of the flag:
@@ -226,12 +240,15 @@ Running this data throuugh the decryption function yields the second part of the
 ```
 
 We still don't have the full flag, but if we look back at the loop that was comparing our XXTEA encrypted input to data in the binary, something that stands out is how long the loop continues on for, because the flag certanly isn't `39999 (0x9C3F)` bytes long:
+
 ![75c0eb3af5496f2b35a2a365c8cadc8b.png](../_resources/fc09e3c9ca244593a789e7b934eaa5a8.png)
 
 In fact, this loop is much larger than the size allocated for the stack buffer, and if it goes too far, it will start corrupting the stack:
+
 ![56e27eb671f5959c4f06ef05bab8b6c7.png](../_resources/5cdae76b42784dc4891a8155978fbf62.png)
 
 If we breakpoint at the end of the loop we can verify that EDX is now pointing at a variable well beyond the stack buffer:
+
 ![a03e2c9b6a8d7ab70772dd4fc23dd76b.png](../_resources/8054698214ac4e38867c9bb8e4bfe734.png)
 
 This `0x28` offset belongs to the stack variable I've named `SIGSEGV`. We can see that usually it contains 0, and if the primary fork were to call this variable, it would trigger a `SIGSEGV` signal and be handled in the secondary fork debugger:
@@ -243,25 +260,33 @@ What is being written into this variable? Apparently, the offset `0x08053b70`:
 ![d66b93a0a5aad9047857117a548f4ff2.png](../_resources/a3b26b3002fc4401adf8a500c7ffebce.png)
 
 Normally, if we were to look at this address we would see nothing of interest:
+
 ![0bc828748f72214912a01de7cbe34da8.png](../_resources/9107ce0591d348c5a6865eb2799391cd.png)
+
 ### . . .
+
 ![be9ecf8a5d219488f3004c3e4e1592cc.png](../_resources/7a27751ba1964111a24577effe368710.png)
 
 However, when the XXTEA encryption was running madly through all that memory, the bytes at this address became actual code. More specifically, the bytes became a full transcript of the Bee Movie with some code inside of it... Note the `00` byte after the highlighted little-endian address, because the code stops copying data when it hits that zero, so it doesn't destroy too much of the stack:
+
 ![1501e27fba2daccbcc37622235faa760.png](../_resources/df99bed030f34800957043273008997c.png)
 
 In the memory dump we can see the region where it transitions from the Bee Movie script into actual 32-bit ASM as well:
+
 ![048a5b6584e7356d6b7771b2a5acf101.png](../_resources/539ba9e5894b4bb99aefb7dbbcf63957.png)
 
 Now the code procedes to call the value in the `SIGSEGV` variable, which used to be 0 and would have been triggered a `SIGSEGV` error signal to be intercepted by the secondary fork debugger, but is now pointing into the unencrypted data region, which contains hidden ASM:
+
 ![2cf8bb4fbac7389cde06a7ec9f763ebd.png](../_resources/f4d7d5255dbb4a4d9160220d6cd1bc00.png)
 
 Inside this secret code, it first verifies that we have correctly matched the first 32 (0x20) characters of the flag:
+
 ![ab2f0ef46fb81a2564903295730dcb94.png](../_resources/bbceeae8592f41d1a135bca45ba6cbf7.png)
 
 This last bit requires more ingenuity than brute force analysis; there are upwards of 20 function calls, most of which are different from each other and can go more than 5 nested function calls deep, or contain triple nested loops. The quickest way to figure these out is by debugging them and seeing their inputs and outputs, but remember it's impossible to debug this process without first stripping out the second fork so that we can attach to the first fork, which includes making sure all of its VM functionality is properly replicated.
 
 Anyways, we can see the first three calls are zeroing out memory, whereas the next batch of calls takes in hex strings stored in the decrypted movie script as plain text and converts them into actual bytes on the stack:
+
 ![43a94b633c09fc32f332201ff13cc367.png](../_resources/3472cd67d80c4c3b9bc05a71560b180d.png)
 
 Next it does some extremely large multiplication, division, and subtraction using these enormous numbers, along with the bytes from our input and some random numbers for obfuscation:

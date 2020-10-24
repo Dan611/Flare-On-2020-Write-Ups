@@ -61,6 +61,7 @@ if($buffer = $NET2::VirtualAllocEx($NET2::GetCurrentProcess(), 0, $rpl.Length, 1
 ```
 
 Now we can just save the powershell script file and execute it. Getting a breakpoint on the code being executed is as simple as looking for an `NtAllocateVirtualMemory` call with a size that matches the data (86016 bytes):
+
 ![7190438a8c8b895ab825d67a3544f8d5.png](../_resources/effd2958c1d949af9ae4a169d7997bdf.png)
 
 Next we can just breakpoint on the allocated memory region:

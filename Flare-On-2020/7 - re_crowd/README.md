@@ -9,6 +9,7 @@ Looking through these `PROPFIND` requests, they have an interesting pattern:
 ![propfind.gif](../_resources/3cd9489bd6dd4670839531c50b95c2fb.gif)
 
 As we can see, each request contains a URL followed by some junk, then a large amount of static ASCII. The length gets smaller and smaller until suddenly we get this successful request:
+
 ![8947cd59063910f3b87f1369ab5c854c.png](../_resources/10503df8f9814f75abc290500f9644c4.png)
 
 This request returned no error message, and afterwards the server and attacker exchanged binary blobs. `PROPFIND` is noted online for having been vulnerable to buffer overflow attacks overwriting return addresses, so it's likely that's what's happening.
@@ -40,6 +41,7 @@ func();
 ```
 
 When this code runs, the Alpha2-encoder first decodes the unicode back into runnable x86 assembly. It then calls ```LoadLibraryA``` on ```ws2_32.dll``` and attempts to make a connection from the server back to the attacker:
+
 ![eeec7a9ce201cc3e43480d8150d19276.png](../_resources/e1bcee78f858450895946a44e21099e9.png)
 
 The first call in this assembly is used several times for the various LoadLibraryA calls:
@@ -47,6 +49,7 @@ The first call in this assembly is used several times for the various LoadLibrar
 ![8738f246223bab09afc2441d5e37e51e.png](../_resources/06efdc0715324eec9ca607758d1cee28.png)
 
 TCP stream 50 in the WireShark capture shows the data that the attacker sent next when these calls succeeded in the original attack:
+
 ![931f8a76e43ed4035fa27e24152dfd6d.png](../_resources/f360f603b48747e296c4d688668810d3.png)
 
 The currently running shellcode unencrypts this data into more shellcode, then jumps into it. See the appended .c file at the bottom for an implementation of this decryption. The following shows a segment where the first four bytes of the newly acquired data is XORd with a magic number. This becomes ```1239```, which is the length of the rest of the encrypted shellcode:
@@ -54,12 +57,15 @@ The currently running shellcode unencrypts this data into more shellcode, then j
 ![85ca8b300dfae2f2e888ae00c8fc62da.png](../_resources/10f62b60fba14f0b80aa19dac9c88bb5.png)
 
 The decryption also makes use of the string ```killervulture123```, which is in memory after the shellcode decodes itself from unicode:
+
 ![a135f46b7ca1d5da38e6984fffa66368.png](../_resources/109546f201f845b08a74c8991ce9558e.png)
 
 Once we have this second shellcode file decrypted, we can make it executable in mostly the same way as before, loading it as a string literal then calling it in C. Doing so reveals the following:
+
 ![d17f61313fc45caa796b058cd75c9a8e.png](../_resources/c44ff8076c5044bc81bf82760f72d86c.png)
 
 This is likely the file that was stolen from the server, then sent back over the network to the attacker in TCP stream 51:
+
 ![2962c87d475501929ac47efeaa5cc5d9.png](../_resources/6d949fe6170344769a73baa986b40847.png)
 
 The encryption used on this file is very fortunate in that it is bi-directional; encrypt it twice and it's back into its original format! This can be verified by saving the data from TCP stream 51 into ```C:\accounts.txt```, then running the shellcode. If we use a debugger to break on the file being loaded into memory, then use ```ba w4 <address to accounts.txt EOF>``` to break at the end of the encryption, we can view its contents right after its been encrypted a second time:
