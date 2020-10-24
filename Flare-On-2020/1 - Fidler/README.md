@@ -1,5 +1,3 @@
-1 - Fidler
-
 # Challenge 1 - Fidler
 
 This first challenge is a Python program bundled with its source code. When we run the executable we are greeted with the following prompt:

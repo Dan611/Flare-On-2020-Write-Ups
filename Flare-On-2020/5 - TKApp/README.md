@@ -1,13 +1,13 @@
-5 - TKApp
-
 # Challenge 5 - TKApp
 
 The `TKApp.tpk` file provided with this challenge is, according to the challenge description, some form of mobile app for a watch. Looking up the format online reveals `.tpk` files can be run on the `Tizen` mobile OS. Closer inspection of the file reveals that it can be extracted as a simple ZIP archive:
+
 ![3676d1b6575618d54726dd3b5544f2cd.png](../_resources/3b4d033758b54b258a45363a89a310b5.png)
 ![159277196829155a3862105de947bdfb.png](../_resources/898e45c24a1a44fc803ee31610b49e1b.png)
 
 The binaries themselves for this challenge are located inside the `bin` folder:
 ![934a9f5b35f31f415d27f18ee40d2126.png](../_resources/0247d760dfe44c87907519ad5ea07bd2.png)
+
 `TKApp.dll` is the only file with a modification date in this year, and the other files all appear to be helper libraries, so this is likely the primary point of execution. A quick look in IDA lets us know that the binary is a .NET assembly, and reminds us that we don't have the expensive IDA license required to view it!
 ![21895a10bc4539dc3da1205746c682c9.png](../_resources/12bdb53eceb24a8ea5486fe3a9ac460d.png)
 ![18c792eaab36e6514ab24995a380e107.png](../_resources/78537dfe7ef7475eb4d5a512e7df79be.png)
@@ -19,10 +19,12 @@ The first snippits of code that stand out after looking through these C# classes
 ![19a5de48c1980badc29af79d2e444bc0.png](../_resources/e1b44ed09b7845c4800fda2fb3b44492.png)
 
 The `Decode` function and `TKData.Password` variable are defined as follows:
+
 ![c6b083389f2115cfe01eec76aef4d777.png](../_resources/511acbd019564ed9b3c88102848b5538.png)
 ![0a74803b670269764c9595bc3413cb46.png](../_resources/95f727ab11b745369ac349c6280c0c70.png)
 
 With a simple XOR loop we can get `UnlockPage`'s password, `"mullethat"`. Checking references to `IsPasswordCorrect` shows us that this password gets stored in `App.Password`:
+
 ![cd796aacd28252aa5f590670824697e4.png](../_resources/3bbcc565e41d4951a824882c56d2044f.png)
 
 Tracing the references to `App.Password` leads us to the following `GetImage` function:
@@ -34,6 +36,7 @@ For `App.Note` we check the references which brings us to the following code sni
 ![fb3832d0091f572b10f79b98bf8d3a08.png](../_resources/d2b7f884176e4c879f049efad5dcf081.png)
 
 The value we want is set at the bottom, and working our way backwards we can see that items from the `todo` variable are only added to `list2` if the `Done` field is `false`. Hovering over `Todo` reveals the following structure, which shows us what we're working with:
+
 ![63eb27b680fffefad42a5a271ac91bdd.png](../_resources/ed0ff3586e20429e9a679d09f9f7a102.png)
 
 This means `App.Note` will either be `"and enable GPS"` or `"keep steaks for dinner"`, but it seems likely to be the second one since this one only occurs if `this.isHome` is true, which sounds like some kind of security measure.
@@ -65,6 +68,7 @@ Looking back at the code that created the `text` variable, to complete the chall
 ![8442cdb05cb00190ba5179cb3996c458.png](../_resources/6fc9b4bf0eec45a6921eca98a8472a4a.png)
 
 Note that the `Runtime.Runtime_dll` file passed into this function as `byte[] cipherText` can be acquired from the app's `Resources` section:
+
 ![5b2b8c41ccd6e9d7313015eee043c271.png](../_resources/97b2a19e34114b5f96c029b3ebd1f4cc.png)
 
 Re-implementing the above function (AES decryption) in Python yields the following:
@@ -87,6 +91,7 @@ Re-implementing the above function (AES decryption) in Python yields the followi
 62532
 ```
 Opening the output `flag.jpg` file gives us the flag:
+
 ![flag.jpg](../_resources/4725a4fc1b64450bbad682c5c1ad8bb6.jpg)
 
 Flag: `n3ver_go1ng_to_recov3r@flare-on.com`

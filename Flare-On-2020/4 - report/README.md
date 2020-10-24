@@ -1,5 +1,3 @@
-4 - report
-
 # Challenge 4 - report
 
 The provided `report.xls` for this challenge has VBA macros that mess around with data inside the Microsoft Office document.
@@ -56,6 +54,7 @@ After getting the strings, it makes some external library calls to make sure the
 Next, it decodes the form data "F.T" using ```canoodle``` and the XOR key ```[0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE]```, and saves it to the file ```AppData\Microsoft\stomp.mp3```.
 
 When we re-implement the macros in Python, the script creates the file __stomp.mp3__:
+
 ![64eafa53962d313e059225e58b0f0644.png](../_resources/439a3db5e8b74a58a58aa6a6dc8b60ec.png)
 
 

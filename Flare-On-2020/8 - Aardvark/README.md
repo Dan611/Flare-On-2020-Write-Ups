@@ -1,8 +1,7 @@
-8 - Aardvark
-
 # Challenge 8 - Aardvark
 
 This challenge provides us with the binary `ttt2.exe`, but it fails to execute:
+
 ![d0ecb38d0491035e1d644becfca97a08.png](../_resources/289abfbd003a436a82715aace8d0fb39.png)
 
 Looking around in it we find the following string, which suggests this binary might require the Windows Subsystem for Linux (WSL):
@@ -15,6 +14,7 @@ The game is pretty straight forward; since the AI takes the first move by placin
 ![9ce1f1a20748ebaff40073d32614b21e.png](../_resources/b3efa8ff1db0436290401cd3157d17c5.png)
 
 At the bottom of the Linux binary's `main` function is this `o-eralf@` string, suggesting that reaching the end of the game correctly might produce the flag:
+
 ![19a563ed4801529024c56f7a037ef14b.png](../_resources/3f11a2db65ff4413931b2c17b7dee65e.png)
 
 ![220709a13b1521dd414abfff3aaedeb9.png](../_resources/37b089921743478b814eec40dede80b1.png)
@@ -32,8 +32,11 @@ Microsoft 4.4.0-18362.1-Microsoft 4.4.35
 The tic-tac-toe game is set up to be impossible to win, but let's try patching the Linux binary so that it sends an `O` instead of an `X`, guaranteeing a win:
 
 The original assembly which sends `X`:
+
 ![8e02f284e6bd5653ee4f9285f3c5b3e8.png](../_resources/ea2e0305cdef4601b538a5bed1ed968c.png)
+
 Patched to send ```O```:
+
 ![d74a322d32f5e6d57b816361b8c27f99.png](../_resources/f5a398885c27457688c95bc12c247768.png)
 
 Now let's start the tic-tac-toe server manually by running our modified `.tmp` Linux binary, and connect to it via the socket file using the `socat` command:

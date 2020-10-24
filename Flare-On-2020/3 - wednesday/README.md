@@ -1,5 +1,3 @@
-3 - wednesday
-
 # Challenge 3 - wednesday
 
 This challenge provides a fully fuctioning video game, along with the following prompt:
@@ -42,6 +40,7 @@ Let's try changing this code to only take the left branch:
 ![a11299762191c0f52904a31d3a83be29.png](../_resources/c15fccd6a3b6415780733f4534e8e15d.png)
 
 If we try out the game now, we can dodge all blocks just by holding down. Applying a speedhack to make the game progress faster gives us the flag:
+
 ![dude.gif](../_resources/ab25c3e9f01a4654bd6df31c4211a4d7.gif)
 
 Flag: `1t_i5_wEdn3sd4y_mY_Dud3s@flare-on.com`

@@ -1,5 +1,3 @@
-6 - codeit
-
 # Challenge 6 - codeit
 
 When we first extract ```codeit.exe```, we note that it is packed with UPX. Unpacking it and running ```strings -e l``` on it to get the UTF-16LE strings reveals some interesting output:
@@ -115,6 +113,7 @@ generate_qr_code(input_str);
 It's more involved than that, but in general the script uses Windows .dll calls to get the computer name, transform it using data from the supplied .bmp file, then attempt to use it as a key to decrypt some encrypted data. If it succeeds in doing so, it will replace the input string with the flag and show the QR code for that instead.
 
 Something interesting to note is that when it transforms the computer name, it uses 7 bytes from the .bmp per char. Also, each byte from the .bmp is either `0xFF` or `0xFE`:
+
 ![391aec0eaea65f5687fb3b8b4acf9e10.png](../_resources/6b51a681bba144828932ed1dcb1bfd6b.png)
 
 Remembering that UTF-8 uses 7 bits to encode characters, and that the .bmp is using 7 bytes per character each being ANDded with 1 then shifted, we might want to take a closer look at each pair of 7 bytes from the .bmp:

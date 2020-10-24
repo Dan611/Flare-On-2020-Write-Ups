@@ -1,5 +1,3 @@
-10 - break
-
 # Challenge 10 - break
 
 This challenge simply provides a file called `break` and the following comforting message:
@@ -7,11 +5,14 @@ This challenge simply provides a file called `break` and the following comfortin
 As a reward for making it this far in Flare-On, we've decided to give you a break. Welcome to the land of sunshine and rainbows!
 ```
 Although that's not very reassuring, taking a peek at the file reveals it to be a 32-bit ELF Linux executable. Let's look at the program actually executing. We enter the password to the previous challenge, and are then told that `sorry i stole your input :)` is not the correct password:
+
 ![c427bdbe3ef7df7e5b93c88ca9a2240e.png](../_resources/748e16ffeb1d47198df2acf61c6143ad.png)
 
 Hmm...  In IDA the function call that stands out the most is `ptrace`, which is called 57 times!
 ![484fa3d1bedcd6e7e9b0a29fe0535ff0.png](../_resources/09cab9e470024be1a800fd3eed348c6a.png)
+
 It's important to realize just how versatile [ptrace](https://www.man7.org/linux/man-pages/man2/ptrace.2.html) can be, so here are some of the arguments to it we might expect to see:
+
 ```txt
 PTRACE_ATTACH   - Attach to the target process
 PTRACE_PEEKDATA - Read data from the target process
@@ -23,7 +24,9 @@ PTRACE_CONT     - Continue target process execution after an interrupt
 With just these arguments you could potentially write a fully-fledged debugger, which seems likely considering how many calls are occuring. The process has two main forks which then attach to their parent and act like debuggers, intercepting certain calls and signals. Here is the first `fork` call, and it is interesting to note that this is called from `init`, before the process's `main` function even has a chance to execute:
 ![6de1f23f07e879f56799bee718377586.png](../_resources/4f170fc43a92413cb5a392c0792230c8.png)
 ![4408e62449f827bc26f6164157870a9c.png](../_resources/9c352b7840964da79b81090ac6ef349c.png)
+
 Now we have the original parent process, as well as a fork that has attached to it using `ptrace`. Also note the `_nanosleep_` call, which will give the forked child process some time to attach before the parent resumes executing after the fork call. Some similar code is called from this child fork, where a second fork is created that then attaches itself to the first fork:
+
 ![4324899e86dc76f1b97c357ac0ccfb13.png](../_resources/42e9f90fb9ba4bec8a60279bd6827ca4.png)
 ![e8591eddc49d5f6c90f99348c9f89f6f.png](../_resources/bc5f2fda970c4ea89c7ffe153ea43128.png)
 ![914939b9d8b6f7c0137385ecef8306fe.png](../_resources/7289a30f93154d1092684726e146ebea.png)
@@ -56,6 +59,7 @@ struct user_regs_struct
 };
 ```
 Since the registers were loaded at `ebp-0xCC`, and `(0xCC - 0xA0) / 4 = 0xB = 11`, we can see it's referencing the 12th (offset 11 from the start) struct entry ```orig_eax```. It's important to note that if `ptrace` is used to intercept syscalls, `orig_eax` will contain the number of the syscall. We can see the program do some quick obfuscation to `orig_eax` then procede to compare it to several values to determine its path of execution:
+
 ![3c84679bc1c8b2401c670488f605a9b5.png](../_resources/f218f70d60964a63bb52b00558ab7eda.png)
 
 The following bash script will generate the obfuscated codes for every Linux 32-bit syscall, which can be cross-checked in the Linux source code at [syscall_32.tbl](https://github.com/torvalds/linux/blob/master/arch/x86/entry/syscalls/syscall_32.tbl).
@@ -89,6 +93,7 @@ One example VM function is the following, which occurs when the parent attempts 
 
 We know that the program doesn't actually seem to work so simply though, because somewhere along the way our input was overwritten. The marked `_read` operation above in the parent triggers the following VM handler function in the primary fork:
 ![44e34fd26ed3bfbd0d2fb7278218aebb.png](../_resources/e6644d8207274d80ab505fea6a0ab1ae.png)
+
 What is happening? First, the fork calls `_fgets` to actually acquire the user input. Next, `0xB8` is passed into a `string_decryptor` function, which returns a decrypted string stored at a certain index in the binary. This string is then written into the parent process's memory using `write_mem_to_pid`, which is simply a wrapper for `PTRACE_POKEDATA`.
 
 With the following quick bash script we can modify the `0xB8` byte to be anything between `0x00 - 0xFF`. It then executes the modified program, which will replace that `sorry i stole your input :)` string we saw earlier with some other decrypted string. We can use the program output to form a list of decrypted strings, which are placed below. 
@@ -138,8 +143,11 @@ Aside from some fake `@no-flare.com` flags, there's nothing too interesting in t
 Something else to note about the second debugger (the second fork attached to the first fork), is that although it is small and handles significantly less VM functionality than the primary debugger, its existence means we can't debug the first fork at all. We can completely patch it out however, and with some cleanup making sure execution will be the same as before, we can now debug the first fork:
 
 Before:
+
 ![251df299f55f5887475b9a502cb1f89e.png](../_resources/430ccafef2b14a7088e3002a1f718910.png)
+
 After:
+
 ![f806896922c31ae02b6e13277b112f21.png](../_resources/23246300d4e141f8b8baba7c0f3902c2.png)
 
 The parent's `main` function still wasn't doing anything that would lead us to the flag though, but note the following action the primary fork takes. The ASM bytes for a UD2 breakpoint are written to the beginning of the `flag_fhecker` function, so that the parent will trigger a `SIGILL` signal to the primary fork debugger:
@@ -153,7 +161,9 @@ Afterwards, the parent process will now resume execution here:
 ![4e233f6ce71db20077a342f15bcccad5.png](../_resources/f7f9b29ca5434828bb74cabf49909d41.png)
 
 The parent process then makes some VM calls and calls some decryptor functions, and finally compares our input string to what it decrypted. A trick here is that if we modify the binary to re-route `_memcmp` calls to `puts`, and NOP out the ```push [ebp+input_string_ptr]``` so that the decrypted data pointer is at the top of the stack, we can see what its trying to compare against:
+
 ![8524cf4a96617968afd9210ae16b668f.png](../_resources/3605e99ae07c4fa584b4c4767bd52bf8.png)
+
 ![2a69c640d96a534c3b9db71f2af2eb01.png](../_resources/faf29d4be9524cf0be1c0cb3860499c6.png)
 
 ![be3d69377279e568bb6a671c3826e951.png](../_resources/79f14d22a17147efac31cf95cf5b734b.png)
@@ -167,6 +177,7 @@ We can see it's looping over our input string, then using it somehow with a `_tr
 As was hinted to us in one of the decrypted strings, this part uses something similar to XXTEA encryption to encode our input bytes. It uses lots of syscalls which get handled in the primary fork debugger, some of which call NULL pointers themsleves, which then get handled by the second debugger!
 
 Even for simply looping, the parent proces calls a NULL pointer, which sends a `SIGSEGV` signal to the primary fork debugger (`call eax` below):
+
 ![64dd2fc64268dc4883d06814aea4e14c.png](../_resources/4f85708574a545338834fbc56267e94f.png)
 
 Here is where it's handled in the primary fork debugger, where the `i` loop count variable is incremented, and we loop if `i` is less than 16, othwersie we return from the call and exit the loop:
@@ -224,9 +235,11 @@ If we breakpoint at the end of the loop we can verify that EDX is now pointing a
 ![a03e2c9b6a8d7ab70772dd4fc23dd76b.png](../_resources/8054698214ac4e38867c9bb8e4bfe734.png)
 
 This `0x28` offset belongs to the stack variable I've named `SIGSEGV`. We can see that usually it contains 0, and if the primary fork were to call this variable, it would trigger a `SIGSEGV` signal and be handled in the secondary fork debugger:
+
 ![51df06bd4ab1980ec9e28029bc66f323.png](../_resources/4cf078affcae478d91f1905a40c60fb2.png)
 
-What is being written into this variable? Aparrently, the offset `0x08053b70`:
+What is being written into this variable? Apparently, the offset `0x08053b70`:
+
 ![d66b93a0a5aad9047857117a548f4ff2.png](../_resources/a3b26b3002fc4401adf8a500c7ffebce.png)
 
 Normally, if we were to look at this address we would see nothing of interest:
@@ -252,14 +265,19 @@ Anyways, we can see the first three calls are zeroing out memory, whereas the ne
 ![43a94b633c09fc32f332201ff13cc367.png](../_resources/3472cd67d80c4c3b9bc05a71560b180d.png)
 
 Next it does some extremely large multiplication, division, and subtraction using these enormous numbers, along with the bytes from our input and some random numbers for obfuscation:
+
 ![dbff68fd50f67d7d9fe797b05c303da5.png](../_resources/c466230375264fc9a0d8c6ec7754b004.png)
 
 Here's one of the math operations, so we can see just how messy the library it's using can look in ASM:
+
 ![51d02d7cac5e8cba1bb91a5cb7be3473.png](../_resources/f5a14ecb0bed4f89a7df31b00cdfa643.png)
+
 ![96eb0e25fc577fa455ab87929f39a8a2.png](../_resources/730171ce4c8b4aaf8aa692b8ed51747e.png)
+
 We see lots of subcalls inside all of those nested loops, but if you look at the inputs and outputs of the function you can see that the final output is divisible by the inputs, so we can determine it was a multiplication function.
 
 One of the inputs into these huge math operations was our input flag, and when all these math calls are finished, it compares it to what is likely the final part of the flag, before allowing the program to succeed:
+
 ![fad61b896ebfe282e7ac5f5bc620cdc7.png](../_resources/c409057100eb4c74a649641c1fd3b6b6.png)
 
 If we unravel the math operations it does, the end result is essentially

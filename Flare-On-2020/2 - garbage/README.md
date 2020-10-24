@@ -1,5 +1,3 @@
-2 - garbage
-
 # Challenge 2 - garbage
 
 To start off this challenge, trying to run the provided garbage.exe yields:
@@ -16,6 +14,7 @@ Looking back at the resource directory, the ```Raw Address + Raw Size = 0xA200``
 ![74fddc9dd32e9413b1fa87028b38389f.png](../_resources/9da652d6842147afb5b2e780c7810532.png)
 
 However the image will still not run:
+
 ![43cda75109e84dbae76b63d8a501b58e.png](../_resources/cdfcb81e280043a6b8e162669c9d9b9a.png)
 
 Looking at the side-by-side configuration at the bottom of the last hex dump, we can see that the XML file is incomplete. Replacing it with a complete version of the correct size (```0x17D``` bytes, retrieved below again from CFF Explorer) will remove the previous error:
@@ -36,6 +35,7 @@ Looking at the side-by-side configuration at the bottom of the last hex dump, we
 ```
 
 But now we have yet another new error:
+
 ![ea8fd8647820051908d367be4305fe80.png](../_resources/ad2121874788499eac9737f34ca9caf9.png)
 
 Checking the import table, we can see that the .dll names are missing:
