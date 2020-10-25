@@ -1,1 +1,1 @@
-# Write-ups for the 2020 Flare-On CTF
+# Write-ups for the Flare-On 2020 CTF
